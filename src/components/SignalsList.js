@@ -60,11 +60,16 @@ const SignalsList = () => {
     setSelectedSignal(signal);
     form.setFieldsValue({
       signal_id: signal.id,
+      monitor_type: signal.monitor_type ? signal.monitor_type.toLowerCase() : 'stock',
       ticker: signal.ticker,
       direction: signal.signal === 'BUY' ? 'LONG' : 'SHORT',
       entry_price: signal.price,
       quantity: 0.01,
       amount: null,
+      target_1: signal.target_1 || null,
+      target_2: signal.target_2 || null,
+      target_3: signal.target_3 || null,
+      stop_loss: signal.stop_loss || null,
     });
     setTradeModalVisible(true);
   };
@@ -332,9 +337,9 @@ const SignalsList = () => {
           </Select>
 
           <Input
-            placeholder="Ticker"
+            placeholder="Ticker or Company"
             allowClear
-            style={{ width: isMobile ? '100%' : 150 }}
+            style={{ width: isMobile ? '100%' : 180 }}
             value={filters.ticker}
             onChange={(e) => setFilters({ ...filters, ticker: e.target.value })}
           />
@@ -407,6 +412,10 @@ const SignalsList = () => {
             <Input />
           </Form.Item>
 
+          <Form.Item name="monitor_type" hidden>
+            <Input />
+          </Form.Item>
+
           <Form.Item
             label="Ticker"
             name="ticker"
@@ -472,50 +481,58 @@ const SignalsList = () => {
           </Form.Item>
 
           <Form.Item
-            label="Stop Loss"
+            label="Stop Loss (Your SL)"
             name="stop_loss"
+            help={selectedSignal?.stop_loss ? `Algorithm suggested: $${parseFloat(selectedSignal.stop_loss).toFixed(2)}` : 'Set your own stop loss price'}
           >
             <InputNumber
               style={{ width: '100%' }}
               precision={2}
               min={0}
               step={0.01}
+              placeholder="Your stop loss"
             />
           </Form.Item>
 
           <Form.Item
-            label="Target 1"
+            label="Target 1 (Take Profit 1)"
             name="target_1"
+            help={selectedSignal?.target_1 ? `Algorithm suggested: $${parseFloat(selectedSignal.target_1).toFixed(2)}` : 'Optional: First profit target'}
           >
             <InputNumber
               style={{ width: '100%' }}
               precision={2}
               min={0}
               step={0.01}
+              placeholder="Target 1"
             />
           </Form.Item>
 
           <Form.Item
-            label="Target 2"
+            label="Target 2 (Take Profit 2)"
             name="target_2"
+            help={selectedSignal?.target_2 ? `Algorithm suggested: $${parseFloat(selectedSignal.target_2).toFixed(2)}` : 'Optional: Second profit target'}
           >
             <InputNumber
               style={{ width: '100%' }}
               precision={2}
               min={0}
               step={0.01}
+              placeholder="Target 2"
             />
           </Form.Item>
 
           <Form.Item
-            label="Target 3"
+            label="Target 3 (Take Profit 3)"
             name="target_3"
+            help={selectedSignal?.target_3 ? `Algorithm suggested: $${parseFloat(selectedSignal.target_3).toFixed(2)}` : 'Optional: Third profit target'}
           >
             <InputNumber
               style={{ width: '100%' }}
               precision={2}
               min={0}
               step={0.01}
+              placeholder="Target 3"
             />
           </Form.Item>
 
