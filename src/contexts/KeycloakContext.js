@@ -19,7 +19,7 @@ const keycloakInitOptions = {
   checkLoginIframe: false,
   pkceMethod: 'S256',
   enableLogging: true,
-  silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+  responseMode: 'query',
 };
 
 export const KeycloakProvider = ({ children }) => {
