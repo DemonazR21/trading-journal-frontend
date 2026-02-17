@@ -20,20 +20,26 @@ export const KeycloakProvider = ({ children }) => {
     console.log('[KeycloakContext] Initializing...');
 
     // Create Keycloak instance
-    const kc = new Keycloak({
-      url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
+    const keycloakConfig = {
       realm: 'trading',
       clientId: 'trading-frontend',
-    });
+      url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
+    };
 
-    console.log('[KeycloakContext] Config:', {
-      url: kc.authServerUrl || kc.url,
+    console.log('[KeycloakContext] Creating Keycloak with config:', keycloakConfig);
+
+    const kc = new Keycloak(keycloakConfig);
+
+    console.log('[KeycloakContext] Keycloak instance created:', {
+      authServerUrl: kc.authServerUrl,
       realm: kc.realm,
-      clientId: kc.clientId
+      clientId: kc.clientId,
     });
 
     // Initialize Keycloak
     kc.init({
+      onLoad: 'check-sso',
+      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
       checkLoginIframe: false,
       pkceMethod: 'S256',
       enableLogging: true,
@@ -80,9 +86,8 @@ export const KeycloakProvider = ({ children }) => {
   const login = () => {
     console.log('[KeycloakContext] Login requested');
     if (keycloak) {
-      // Use cordova adapter which uses iframe
       keycloak.login({
-        adapter: 'cordova',
+        redirectUri: window.location.origin + window.location.pathname,
       });
     } else {
       console.error('[KeycloakContext] Keycloak not initialized');
