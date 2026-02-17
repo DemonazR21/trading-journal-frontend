@@ -15,7 +15,6 @@ const keycloakInstance = new Keycloak(keycloakConfig);
 
 // Keycloak init options
 const keycloakInitOptions = {
-  onLoad: 'check-sso',
   checkLoginIframe: false,
   pkceMethod: 'S256',
   enableLogging: true,
