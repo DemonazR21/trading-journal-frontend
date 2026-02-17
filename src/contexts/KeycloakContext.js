@@ -34,7 +34,8 @@ export const KeycloakProvider = ({ children }) => {
       checkLoginIframe: false,
       pkceMethod: 'S256',
       redirectUri: redirectUri,
-      enableLogging: true
+      enableLogging: true,
+      responseMode: 'query'  // Use query params instead of fragment to avoid React Router conflict
     })
       .then((auth) => {
         console.log('[KeycloakContext] Init success! Authenticated:', auth);
