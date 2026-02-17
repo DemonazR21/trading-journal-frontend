@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Typography, Tag, Space, Button, Select, Input, Modal, Form, InputNumber, message, Grid } from 'antd';
+import { Table, Card, Typography, Tag, Space, Button, Select, Input, Modal, Form, InputNumber, message, Grid, DatePicker } from 'antd';
 import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
 
 const { Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 const { useBreakpoint } = Grid;
 
 const SignalsList = () => {
@@ -19,6 +20,8 @@ const SignalsList = () => {
     ticker: undefined,
     signal: undefined,
     limit: 50,
+    date_from: undefined,
+    date_to: undefined,
   });
   const [tradeModalVisible, setTradeModalVisible] = useState(false);
   const [selectedSignal, setSelectedSignal] = useState(null);
@@ -36,6 +39,8 @@ const SignalsList = () => {
       if (filters.ticker) params.ticker = filters.ticker;
       if (filters.signal) params.signal = filters.signal;
       if (filters.limit) params.limit = filters.limit;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
 
       const response = await api.getSignals(params);
 
@@ -102,6 +107,22 @@ const SignalsList = () => {
     } catch (error) {
       console.error('Failed to create trade:', error);
       message.error('Failed to create trade');
+    }
+  };
+
+  const handleDateRangeChange = (dates) => {
+    if (dates && dates.length === 2) {
+      setFilters({
+        ...filters,
+        date_from: dates[0].format('YYYY-MM-DD'),
+        date_to: dates[1].format('YYYY-MM-DD'),
+      });
+    } else {
+      setFilters({
+        ...filters,
+        date_from: undefined,
+        date_to: undefined,
+      });
     }
   };
 
@@ -366,6 +387,13 @@ const SignalsList = () => {
             <Option value={100}>100</Option>
             <Option value={200}>200</Option>
           </Select>
+
+          <RangePicker
+            style={{ width: isMobile ? '100%' : 280 }}
+            onChange={handleDateRangeChange}
+            format="YYYY-MM-DD"
+            placeholder={['Start Date', 'End Date']}
+          />
         </Space>
       </Card>
 

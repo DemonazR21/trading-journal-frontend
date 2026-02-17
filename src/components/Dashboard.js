@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Button, Space, Typography, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Button, Space, Typography, Spin, Grid } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import {
   DollarOutlined,
@@ -12,9 +12,12 @@ import {
 import { api } from '../api/client';
 
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md; // md breakpoint is 768px
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,13 +47,15 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={2}>Dashboard</Title>
-        <Space>
+      <div style={{ marginBottom: '24px' }}>
+        <Title level={2} style={{ marginBottom: isMobile ? '16px' : '0' }}>Dashboard</Title>
+        <Space direction={isMobile ? 'vertical' : 'horizontal'} style={{ width: isMobile ? '100%' : 'auto', marginTop: isMobile ? '8px' : '0' }}>
           <Button
             type="primary"
             icon={<SignalFilled />}
             onClick={() => navigate('/signals')}
+            block={isMobile}
+            size={isMobile ? 'large' : 'middle'}
           >
             View Signals
           </Button>
@@ -58,6 +63,8 @@ const Dashboard = () => {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => navigate('/trades')}
+            block={isMobile}
+            size={isMobile ? 'large' : 'middle'}
           >
             New Trade
           </Button>

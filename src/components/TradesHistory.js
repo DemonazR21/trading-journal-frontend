@@ -34,6 +34,7 @@ const TradesHistory = () => {
   const [filters, setFilters] = useState({
     status: undefined,
     ticker: undefined,
+    direction: undefined,
     date_from: undefined,
     date_to: undefined,
   });
@@ -51,6 +52,7 @@ const TradesHistory = () => {
       const params = {};
       if (filters.status) params.status = filters.status;
       if (filters.ticker) params.ticker = filters.ticker;
+      if (filters.direction) params.direction = filters.direction;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
 
@@ -411,6 +413,17 @@ const TradesHistory = () => {
             <Option value="OPEN">Open</Option>
             <Option value="CLOSED">Closed</Option>
             <Option value="CANCELLED">Cancelled</Option>
+          </Select>
+
+          <Select
+            placeholder="Direction"
+            allowClear
+            style={{ width: isMobile ? '100%' : 120 }}
+            value={filters.direction}
+            onChange={(value) => setFilters({ ...filters, direction: value })}
+          >
+            <Option value="LONG">Long</Option>
+            <Option value="SHORT">Short</Option>
           </Select>
 
           <Input
