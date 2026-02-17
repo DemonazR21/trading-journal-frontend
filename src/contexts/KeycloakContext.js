@@ -11,42 +11,63 @@ export const useKeycloak = () => {
   return context;
 };
 
+// Create Keycloak instance once at module level
+let keycloakInstance = null;
+let isInitializing = false;
+let initPromise = null;
+
+const getKeycloakInstance = () => {
+  if (!keycloakInstance) {
+    console.log('[KeycloakContext] Creating new Keycloak instance');
+    keycloakInstance = new Keycloak({
+      url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
+      realm: 'trading',
+      clientId: 'trading-frontend',
+    });
+  }
+  return keycloakInstance;
+};
+
 export const KeycloakProvider = ({ children }) => {
   const [keycloak, setKeycloak] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Reuse existing Keycloak instance if available
-    if (window._keycloakInstance) {
-      console.log('[KeycloakContext] Reusing existing Keycloak instance');
-      setKeycloak(window._keycloakInstance);
-      setAuthenticated(!!window._keycloakInstance.token);
+    const kc = getKeycloakInstance();
+
+    // If already initialized, just reuse the state
+    if (kc.authenticated !== undefined) {
+      console.log('[KeycloakContext] Keycloak already initialized, reusing state');
+      setKeycloak(kc);
+      setAuthenticated(kc.authenticated);
       setInitialized(true);
       return;
     }
 
+    // If currently initializing, wait for existing init
+    if (isInitializing && initPromise) {
+      console.log('[KeycloakContext] Init in progress, waiting...');
+      initPromise.then(() => {
+        setKeycloak(kc);
+        setAuthenticated(kc.authenticated || false);
+        setInitialized(true);
+      });
+      return;
+    }
+
+    isInitializing = true;
     console.log('[KeycloakContext] Initializing Keycloak...');
 
     const redirectUri = window.location.origin + '/';
     console.log('[KeycloakContext] Redirect URI:', redirectUri);
-
-    const kc = new Keycloak({
-      url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
-      realm: 'trading',
-      clientId: 'trading-frontend',
-    });
-
-    // Store instance globally to prevent re-initialization
-    window._keycloakInstance = kc;
-
     console.log('[KeycloakContext] Config:', {
       url: kc.authServerUrl,
       realm: kc.realm,
       clientId: kc.clientId
     });
 
-    kc.init({
+    initPromise = kc.init({
       checkLoginIframe: false,
       pkceMethod: 'S256',
       redirectUri: redirectUri,
@@ -57,6 +78,7 @@ export const KeycloakProvider = ({ children }) => {
         console.log('[KeycloakContext] Init success! Authenticated:', auth);
         console.log('[KeycloakContext] Token:', kc.token ? 'PRESENT' : 'ABSENT');
 
+        isInitializing = false;
         setKeycloak(kc);
         setAuthenticated(auth);
         setInitialized(true);
@@ -82,6 +104,7 @@ export const KeycloakProvider = ({ children }) => {
       })
       .catch((error) => {
         console.error('[KeycloakContext] Init error:', error);
+        isInitializing = false;
         setKeycloak(kc);
         setAuthenticated(false);
         setInitialized(true);
