@@ -28,7 +28,6 @@ export const KeycloakProvider = ({ children }) => {
     console.log('[KeycloakContext] Config:', { url: kc.url, realm: kc.realm, clientId: kc.clientId });
 
     kc.init({
-      onLoad: 'check-sso',
       checkLoginIframe: false,
       pkceMethod: 'S256'
     })
