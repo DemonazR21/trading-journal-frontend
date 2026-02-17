@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Typography, Tag, Space, Button, Select, Input, Modal, Form, InputNumber, message } from 'antd';
+import { Table, Card, Typography, Tag, Space, Button, Select, Input, Modal, Form, InputNumber, message, Grid } from 'antd';
 import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
 
 const { Title } = Typography;
 const { Option } = Select;
+const { useBreakpoint } = Grid;
 
 const SignalsList = () => {
+  const screens = useBreakpoint();
+  const isMobile = !screens.md; // md breakpoint is 768px
+
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -77,6 +81,86 @@ const SignalsList = () => {
     }
   };
 
+  // Helper to render indicator with color (shared between table and cards)
+  const renderIndicator = (label, score, desc) => {
+    if (score === null || score === undefined) return null;
+
+    let color = '#999';
+    if (score > 0) color = '#52c41a';
+    if (score < 0) color = '#ff4d4f';
+
+    const shortDesc = desc ? (desc.length > 15 ? desc.substring(0, 15) + '...' : desc) : '';
+
+    return (
+      <span key={label} style={{ color, fontWeight: score !== 0 ? 'bold' : 'normal', marginRight: '8px', fontSize: '11px' }}>
+        {label}: {score} {shortDesc && <span style={{ fontSize: '9px', fontWeight: 'normal' }}>({shortDesc})</span>}
+      </span>
+    );
+  };
+
+  // Mobile card view
+  const renderMobileCards = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {signals.map((signal) => {
+        const isCrypto = signal.monitor_type === 'CRYPTO';
+
+        return (
+          <Card key={signal.id} size="small" style={{ borderLeft: `4px solid ${signal.signal === 'BUY' ? '#52c41a' : signal.signal === 'SELL' ? '#ff4d4f' : '#d9d9d9'}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <Tag color={isCrypto ? 'gold' : signal.monitor_type === 'ETF' ? 'green' : 'blue'}>{signal.monitor_type}</Tag>
+                  <strong style={{ fontSize: '16px' }}>{signal.ticker}</strong>
+                  {signal.signal && <Tag color={signal.signal === 'BUY' ? 'green' : 'red'}>{signal.signal}</Tag>}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  {dayjs(signal.timestamp).format('YYYY-MM-DD HH:mm')}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1890ff' }}>
+                  ${parseFloat(signal.price).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '8px', paddingTop: '8px', borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Indicators:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {renderIndicator('RSI', signal.rsi, signal.rsi_desc)}
+                {isCrypto ? (
+                  <>
+                    {renderIndicator('EMA', signal.ema_score, signal.ema_desc)}
+                    {renderIndicator('STRUCT', signal.struct_score, signal.struct_desc)}
+                    {renderIndicator('VOL', signal.vol_score, signal.vol_desc)}
+                    {renderIndicator('LIQ', signal.liq_score, signal.liq_desc)}
+                  </>
+                ) : (
+                  <>
+                    {renderIndicator('MACD', signal.macd, signal.macd_desc)}
+                    {renderIndicator('BOX', signal.box_score, signal.box_desc)}
+                    {renderIndicator('VOL', signal.vol_score, signal.vol_desc)}
+                    {renderIndicator('FIB', signal.fib_score, signal.fib_desc)}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={() => handleCreateTrade(signal)}
+              block
+            >
+              Create Trade
+            </Button>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
   const columns = [
     {
       title: 'Time',
@@ -127,15 +211,13 @@ const SignalsList = () => {
       render: (_, record) => {
         const isCrypto = record.monitor_type === 'CRYPTO';
 
-        // Helper to render indicator with color
-        const renderIndicator = (label, score, desc) => {
+        const renderTableIndicator = (label, score, desc) => {
           if (score === null || score === undefined) return `${label}: N/A`;
 
-          let color = '#999'; // gray for neutral/0
-          if (score > 0) color = '#52c41a'; // green for positive
-          if (score < 0) color = '#ff4d4f'; // red for negative
+          let color = '#999';
+          if (score > 0) color = '#52c41a';
+          if (score < 0) color = '#ff4d4f';
 
-          // Shorten description if too long
           const shortDesc = desc ? (desc.length > 20 ? desc.substring(0, 20) + '...' : desc) : '';
 
           return (
@@ -147,20 +229,20 @@ const SignalsList = () => {
 
         return (
           <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-            {renderIndicator('RSI', record.rsi, record.rsi_desc)}
+            {renderTableIndicator('RSI', record.rsi, record.rsi_desc)}
             {isCrypto ? (
               <>
-                {renderIndicator('EMA', record.ema_score, record.ema_desc)}
-                {renderIndicator('STRUCT', record.struct_score, record.struct_desc)}
-                {renderIndicator('VOL', record.vol_score, record.vol_desc)}
-                {renderIndicator('LIQ', record.liq_score, record.liq_desc)}
+                {renderTableIndicator('EMA', record.ema_score, record.ema_desc)}
+                {renderTableIndicator('STRUCT', record.struct_score, record.struct_desc)}
+                {renderTableIndicator('VOL', record.vol_score, record.vol_desc)}
+                {renderTableIndicator('LIQ', record.liq_score, record.liq_desc)}
               </>
             ) : (
               <>
-                {renderIndicator('MACD', record.macd, record.macd_desc)}
-                {renderIndicator('BOX', record.box_score, record.box_desc)}
-                {renderIndicator('VOL', record.vol_score, record.vol_desc)}
-                {renderIndicator('FIB', record.fib_score, record.fib_desc)}
+                {renderTableIndicator('MACD', record.macd, record.macd_desc)}
+                {renderTableIndicator('BOX', record.box_score, record.box_desc)}
+                {renderTableIndicator('VOL', record.vol_score, record.vol_desc)}
+                {renderTableIndicator('FIB', record.fib_score, record.fib_desc)}
               </>
             )}
           </div>
@@ -205,11 +287,11 @@ const SignalsList = () => {
           </Button>
         </div>
 
-        <Space style={{ marginBottom: '16px' }} wrap>
+        <Space style={{ marginBottom: '16px', width: isMobile ? '100%' : 'auto' }} wrap direction={isMobile ? 'vertical' : 'horizontal'}>
           <Select
             placeholder="Monitor Type"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: isMobile ? '100%' : 150 }}
             value={filters.monitor_type}
             onChange={(value) => setFilters({ ...filters, monitor_type: value })}
           >
@@ -221,7 +303,7 @@ const SignalsList = () => {
           <Input
             placeholder="Ticker"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: isMobile ? '100%' : 150 }}
             value={filters.ticker}
             onChange={(e) => setFilters({ ...filters, ticker: e.target.value })}
           />
@@ -229,7 +311,7 @@ const SignalsList = () => {
           <Select
             placeholder="Signal Type"
             allowClear
-            style={{ width: 120 }}
+            style={{ width: isMobile ? '100%' : 120 }}
             value={filters.signal}
             onChange={(value) => setFilters({ ...filters, signal: value })}
           >
@@ -239,7 +321,7 @@ const SignalsList = () => {
 
           <Select
             placeholder="Limit"
-            style={{ width: 100 }}
+            style={{ width: isMobile ? '100%' : 100 }}
             value={filters.limit}
             onChange={(value) => setFilters({ ...filters, limit: value })}
           >
@@ -251,18 +333,28 @@ const SignalsList = () => {
         </Space>
       </Card>
 
-      <Table
-        columns={columns}
-        dataSource={signals}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 20,
-          showSizeChanger: true,
-          showTotal: (total) => `Total ${total} signals`,
-        }}
-        scroll={{ x: 1000 }}
-      />
+      {isMobile ? (
+        loading ? (
+          <Card><div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div></Card>
+        ) : signals.length === 0 ? (
+          <Card><div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No signals found</div></Card>
+        ) : (
+          renderMobileCards()
+        )
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={signals}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 20,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} signals`,
+          }}
+          scroll={{ x: 1000 }}
+        />
+      )}
 
       <Modal
         title="Create Trade from Signal"
