@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import Keycloak from 'keycloak-js';
 
 const KeycloakContext = createContext();
@@ -15,8 +15,16 @@ export const KeycloakProvider = ({ children }) => {
   const [keycloak, setKeycloak] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const isInitializing = useRef(false);
 
   useEffect(() => {
+    // Prevent double initialization
+    if (isInitializing.current) {
+      console.log('[KeycloakContext] Already initializing, skipping...');
+      return;
+    }
+
+    isInitializing.current = true;
     console.log('[KeycloakContext] Initializing Keycloak...');
 
     const redirectUri = window.location.origin + '/';
@@ -28,7 +36,11 @@ export const KeycloakProvider = ({ children }) => {
       clientId: 'trading-frontend',
     });
 
-    console.log('[KeycloakContext] Config:', { url: kc.url, realm: kc.realm, clientId: kc.clientId });
+    console.log('[KeycloakContext] Config:', {
+      url: kc.authServerUrl,
+      realm: kc.realm,
+      clientId: kc.clientId
+    });
 
     kc.init({
       checkLoginIframe: false,
