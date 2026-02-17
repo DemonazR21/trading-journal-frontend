@@ -124,13 +124,31 @@ const SignalsList = () => {
     {
       title: 'Indicators',
       key: 'indicators',
-      render: (_, record) => (
-        <div style={{ fontSize: '12px' }}>
-          <div>RSI: {record.rsi ? parseFloat(record.rsi).toFixed(2) : 'N/A'}</div>
-          <div>MACD: {record.macd ? parseFloat(record.macd).toFixed(4) : 'N/A'}</div>
-        </div>
-      ),
-      width: 120,
+      render: (_, record) => {
+        const isCrypto = record.monitor_type === 'CRYPTO';
+
+        return (
+          <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+            <div>RSI: {record.rsi ?? 'N/A'}</div>
+            {isCrypto ? (
+              <>
+                <div>EMA: {record.ema_score ?? 'N/A'}</div>
+                <div>STRUCT: {record.struct_score ?? 'N/A'}</div>
+                <div>VOL: {record.vol_score ?? 'N/A'}</div>
+                <div>LIQ: {record.liq_score ?? 'N/A'}</div>
+              </>
+            ) : (
+              <>
+                <div>MACD: {record.macd ?? 'N/A'}</div>
+                <div>BOX: {record.box_score ?? 'N/A'}</div>
+                <div>VOL: {record.vol_score ?? 'N/A'}</div>
+                <div>FIB: {record.fib_score ?? 'N/A'}</div>
+              </>
+            )}
+          </div>
+        );
+      },
+      width: 140,
     },
     {
       title: 'Reason',
