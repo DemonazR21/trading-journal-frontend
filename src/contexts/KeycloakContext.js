@@ -39,11 +39,11 @@ export const KeycloakProvider = ({ children }) => {
     // Initialize Keycloak
     kc.init({
       onLoad: 'check-sso',
-      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
       checkLoginIframe: false,
       pkceMethod: 'S256',
       enableLogging: true,
       flow: 'standard',
+      responseMode: 'query',
     })
       .then((auth) => {
         console.log('[KeycloakContext] Init success! Authenticated:', auth);
