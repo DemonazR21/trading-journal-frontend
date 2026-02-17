@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useKeycloak } from './contexts/KeycloakContext';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -53,25 +53,21 @@ function App() {
     );
   }
 
-  return (
-    <Router>
-      {!authenticated ? (
-        <Routes>
-          <Route path="*" element={<LoginScreen />} />
-        </Routes>
-      ) : (
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/signals" element={<SignalsList />} />
-            <Route path="/trades" element={<TradesHistory />} />
-            <Route path="/stats" element={<Stats />} />
-            <Route path="/debug" element={<KeycloakDebug />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      )}
-    </Router>
+  return !authenticated ? (
+    <Routes>
+      <Route path="*" element={<LoginScreen />} />
+    </Routes>
+  ) : (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/signals" element={<SignalsList />} />
+        <Route path="/trades" element={<TradesHistory />} />
+        <Route path="/stats" element={<Stats />} />
+        <Route path="/debug" element={<KeycloakDebug />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Layout>
   );
 }
 
