@@ -13,20 +13,29 @@ import {
   InputNumber,
   message,
   Popconfirm,
+  DatePicker,
+  Grid,
 } from 'antd';
-import { SearchOutlined, EditOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
+import { SearchOutlined, EditOutlined, DeleteOutlined, CheckOutlined, DollarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
 
 const { Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
+const { useBreakpoint } = Grid;
 
 const TradesHistory = () => {
+  const screens = useBreakpoint();
+  const isMobile = !screens.md; // md breakpoint is 768px
+
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: undefined,
     ticker: undefined,
+    date_from: undefined,
+    date_to: undefined,
   });
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -42,6 +51,8 @@ const TradesHistory = () => {
       const params = {};
       if (filters.status) params.status = filters.status;
       if (filters.ticker) params.ticker = filters.ticker;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
 
       const response = await api.getTrades(params);
       setTrades(response.data);
@@ -50,6 +61,22 @@ const TradesHistory = () => {
       message.error('Failed to load trades');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDateRangeChange = (dates) => {
+    if (dates && dates.length === 2) {
+      setFilters({
+        ...filters,
+        date_from: dates[0].format('YYYY-MM-DD'),
+        date_to: dates[1].format('YYYY-MM-DD'),
+      });
+    } else {
+      setFilters({
+        ...filters,
+        date_from: undefined,
+        date_to: undefined,
+      });
     }
   };
 
@@ -111,13 +138,124 @@ const TradesHistory = () => {
     }
   };
 
+  const calculatePnL = (trade) => {
+    if (!trade.exit_price || !trade.entry_price) return null;
+    const multiplier = trade.direction === 'LONG' ? 1 : -1;
+    const pnl = multiplier * (parseFloat(trade.exit_price) - parseFloat(trade.entry_price)) * parseFloat(trade.quantity);
+    return pnl;
+  };
+
+  const calculatePnLPercentage = (trade) => {
+    if (!trade.exit_price || !trade.entry_price) return null;
+    const multiplier = trade.direction === 'LONG' ? 1 : -1;
+    const pnlPct = multiplier * ((parseFloat(trade.exit_price) - parseFloat(trade.entry_price)) / parseFloat(trade.entry_price)) * 100;
+    return pnlPct;
+  };
+
+  // Mobile card view
+  const renderMobileCards = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {trades.map((trade) => {
+        const pnl = calculatePnL(trade);
+        const pnlPct = calculatePnLPercentage(trade);
+
+        return (
+          <Card
+            key={trade.id}
+            size="small"
+            style={{ borderLeft: `4px solid ${trade.direction === 'LONG' ? '#52c41a' : '#ff4d4f'}` }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <Tag color={trade.monitor_type === 'crypto' ? 'gold' : trade.monitor_type === 'etf' ? 'green' : 'blue'}>
+                    {trade.monitor_type?.toUpperCase()}
+                  </Tag>
+                  <strong style={{ fontSize: '16px' }}>{trade.ticker}</strong>
+                  <Tag color={trade.direction === 'LONG' ? 'green' : 'red'}>{trade.direction}</Tag>
+                  <Tag color={getStatusColor(trade.status)}>{trade.status}</Tag>
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  {dayjs(trade.entry_time || trade.created_at).format('YYYY-MM-DD HH:mm')}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '8px', paddingTop: '8px', borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                <div>
+                  <span style={{ color: '#666' }}>Entry:</span> ${parseFloat(trade.entry_price).toFixed(2)}
+                </div>
+                <div>
+                  <span style={{ color: '#666' }}>Qty:</span> {parseFloat(trade.quantity).toFixed(4)}
+                </div>
+                {trade.exit_price && (
+                  <>
+                    <div>
+                      <span style={{ color: '#666' }}>Exit:</span> ${parseFloat(trade.exit_price).toFixed(2)}
+                    </div>
+                    <div>
+                      <span style={{ color: '#666' }}>P&L:</span>{' '}
+                      <span style={{ color: pnl >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
+                        ${pnl?.toFixed(2)} ({pnlPct?.toFixed(2)}%)
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <Space size="small" style={{ width: '100%', justifyContent: 'flex-end' }}>
+              {trade.status === 'OPEN' && (
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<DollarOutlined />}
+                  onClick={() => handleCloseTrade(trade)}
+                >
+                  Close
+                </Button>
+              )}
+              <Button
+                type="default"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEditTrade(trade)}
+              />
+              <Popconfirm
+                title="Delete trade?"
+                description="This action cannot be undone."
+                onConfirm={() => handleDeleteTrade(trade.id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Space>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
   const columns = [
     {
       title: 'Entry Time',
       dataIndex: 'entry_time',
       key: 'entry_time',
-      render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm'),
+      render: (text, record) => dayjs(text || record.created_at).format('YYYY-MM-DD HH:mm'),
       width: 150,
+    },
+    {
+      title: 'Type',
+      dataIndex: 'monitor_type',
+      key: 'monitor_type',
+      render: (text) => (
+        <Tag color={text === 'crypto' ? 'gold' : text === 'etf' ? 'green' : 'blue'}>
+          {text?.toUpperCase()}
+        </Tag>
+      ),
+      width: 80,
     },
     {
       title: 'Ticker',
@@ -171,13 +309,20 @@ const TradesHistory = () => {
     },
     {
       title: 'P&L',
-      dataIndex: 'pnl',
       key: 'pnl',
-      render: (text) => text ? (
-        <span style={{ color: text >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>
-          ${parseFloat(text).toFixed(2)}
-        </span>
-      ) : '-',
+      render: (_, record) => {
+        const pnl = calculatePnL(record);
+        const pnlPct = calculatePnLPercentage(record);
+
+        if (pnl === null) return '-';
+
+        return (
+          <div style={{ color: pnl >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
+            ${pnl.toFixed(2)}
+            <div style={{ fontSize: '11px' }}>({pnlPct.toFixed(2)}%)</div>
+          </div>
+        );
+      },
       width: 120,
     },
     {
@@ -209,7 +354,7 @@ const TradesHistory = () => {
             <Button
               type="primary"
               size="small"
-              icon={<CheckOutlined />}
+              icon={<DollarOutlined />}
               onClick={() => handleCloseTrade(record)}
             >
               Close
@@ -255,11 +400,11 @@ const TradesHistory = () => {
           </Button>
         </div>
 
-        <Space style={{ marginBottom: '16px' }} wrap>
+        <Space style={{ marginBottom: '16px', width: isMobile ? '100%' : 'auto' }} wrap direction={isMobile ? 'vertical' : 'horizontal'}>
           <Select
             placeholder="Status"
             allowClear
-            style={{ width: 120 }}
+            style={{ width: isMobile ? '100%' : 120 }}
             value={filters.status}
             onChange={(value) => setFilters({ ...filters, status: value })}
           >
@@ -271,25 +416,41 @@ const TradesHistory = () => {
           <Input
             placeholder="Ticker"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: isMobile ? '100%' : 150 }}
             value={filters.ticker}
             onChange={(e) => setFilters({ ...filters, ticker: e.target.value })}
+          />
+
+          <RangePicker
+            style={{ width: isMobile ? '100%' : 280 }}
+            onChange={handleDateRangeChange}
+            format="YYYY-MM-DD"
           />
         </Space>
       </Card>
 
-      <Table
-        columns={columns}
-        dataSource={trades}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 20,
-          showSizeChanger: true,
-          showTotal: (total) => `Total ${total} trades`,
-        }}
-        scroll={{ x: 1400 }}
-      />
+      {isMobile ? (
+        loading ? (
+          <Card><div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div></Card>
+        ) : trades.length === 0 ? (
+          <Card><div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No trades found</div></Card>
+        ) : (
+          renderMobileCards()
+        )
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={trades}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 20,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} trades`,
+          }}
+          scroll={{ x: 1400 }}
+        />
+      )}
 
       <Modal
         title={`${selectedTrade?.status === 'OPEN' ? 'Close' : 'Edit'} Trade`}
@@ -300,7 +461,7 @@ const TradesHistory = () => {
           setSelectedTrade(null);
         }}
         footer={null}
-        width={500}
+        width={isMobile ? '100%' : 500}
       >
         <Form
           form={form}
