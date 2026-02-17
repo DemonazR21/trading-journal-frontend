@@ -7,6 +7,15 @@ const KeycloakDebug = () => {
 
   useEffect(() => {
     if (keycloak) {
+      // Get sessionStorage keys
+      const sessionKeys = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('keycloak') || key.includes('pkce'))) {
+          sessionKeys.push(key);
+        }
+      }
+
       setDebugInfo({
         authenticated: authenticated,
         initialized: initialized,
@@ -21,6 +30,12 @@ const KeycloakDebug = () => {
         subject: keycloak.subject || 'null',
         username: keycloak.tokenParsed?.preferred_username || 'null',
         sessionId: keycloak.sessionId || 'null',
+        currentUrl: window.location.href,
+        hasCodeInUrl: window.location.href.includes('code='),
+        hasStateInUrl: window.location.href.includes('state='),
+        sessionStorageKeys: sessionKeys.join(', ') || 'none',
+        flow: keycloak.flow || 'undefined',
+        responseMode: keycloak.responseMode || 'undefined',
       });
     }
   }, [keycloak, authenticated, initialized]);
@@ -86,6 +101,20 @@ const KeycloakDebug = () => {
           <p><strong>Auth Server URL:</strong> {debugInfo.url}</p>
           <p><strong>Realm:</strong> {debugInfo.realm}</p>
           <p><strong>Client ID:</strong> {debugInfo.clientId}</p>
+          <p><strong>Flow:</strong> {debugInfo.flow}</p>
+          <p><strong>Response Mode:</strong> {debugInfo.responseMode}</p>
+        </div>
+
+        <h3>URL Info:</h3>
+        <div style={{ marginLeft: '20px' }}>
+          <p><strong>Current URL:</strong> <span style={{ fontSize: '10px', wordBreak: 'break-all' }}>{debugInfo.currentUrl}</span></p>
+          <p><strong>Has 'code' parameter:</strong> <span style={{ color: debugInfo.hasCodeInUrl ? 'green' : 'red' }}>{String(debugInfo.hasCodeInUrl)}</span></p>
+          <p><strong>Has 'state' parameter:</strong> <span style={{ color: debugInfo.hasStateInUrl ? 'green' : 'red' }}>{String(debugInfo.hasStateInUrl)}</span></p>
+        </div>
+
+        <h3>SessionStorage:</h3>
+        <div style={{ marginLeft: '20px' }}>
+          <p><strong>Keycloak Keys:</strong> {debugInfo.sessionStorageKeys || 'none'}</p>
         </div>
 
         <h3>User Info:</h3>
