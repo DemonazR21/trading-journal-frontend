@@ -19,6 +19,9 @@ export const KeycloakProvider = ({ children }) => {
   useEffect(() => {
     console.log('[KeycloakContext] Initializing Keycloak...');
 
+    const redirectUri = window.location.origin + '/';
+    console.log('[KeycloakContext] Redirect URI:', redirectUri);
+
     const kc = new Keycloak({
       url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
       realm: 'trading',
@@ -29,7 +32,9 @@ export const KeycloakProvider = ({ children }) => {
 
     kc.init({
       checkLoginIframe: false,
-      pkceMethod: 'S256'
+      pkceMethod: 'S256',
+      redirectUri: redirectUri,
+      enableLogging: true
     })
       .then((auth) => {
         console.log('[KeycloakContext] Init success! Authenticated:', auth);
@@ -69,7 +74,9 @@ export const KeycloakProvider = ({ children }) => {
   const login = () => {
     console.log('[KeycloakContext] Login requested');
     if (keycloak) {
-      keycloak.login();
+      const redirectUri = window.location.origin + '/';
+      console.log('[KeycloakContext] Login with redirectUri:', redirectUri);
+      keycloak.login({ redirectUri: redirectUri });
     } else {
       console.error('[KeycloakContext] Keycloak not initialized');
     }
