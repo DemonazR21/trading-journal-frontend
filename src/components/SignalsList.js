@@ -127,28 +127,46 @@ const SignalsList = () => {
       render: (_, record) => {
         const isCrypto = record.monitor_type === 'CRYPTO';
 
+        // Helper to render indicator with color
+        const renderIndicator = (label, score, desc) => {
+          if (score === null || score === undefined) return `${label}: N/A`;
+
+          let color = '#999'; // gray for neutral/0
+          if (score > 0) color = '#52c41a'; // green for positive
+          if (score < 0) color = '#ff4d4f'; // red for negative
+
+          // Shorten description if too long
+          const shortDesc = desc ? (desc.length > 20 ? desc.substring(0, 20) + '...' : desc) : '';
+
+          return (
+            <div key={label} style={{ color, fontWeight: score !== 0 ? 'bold' : 'normal' }}>
+              {label}: {score} {shortDesc && <span style={{ fontSize: '10px', fontWeight: 'normal' }}>({shortDesc})</span>}
+            </div>
+          );
+        };
+
         return (
           <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-            <div>RSI: {record.rsi ?? 'N/A'}</div>
+            {renderIndicator('RSI', record.rsi, record.rsi_desc)}
             {isCrypto ? (
               <>
-                <div>EMA: {record.ema_score ?? 'N/A'}</div>
-                <div>STRUCT: {record.struct_score ?? 'N/A'}</div>
-                <div>VOL: {record.vol_score ?? 'N/A'}</div>
-                <div>LIQ: {record.liq_score ?? 'N/A'}</div>
+                {renderIndicator('EMA', record.ema_score, record.ema_desc)}
+                {renderIndicator('STRUCT', record.struct_score, record.struct_desc)}
+                {renderIndicator('VOL', record.vol_score, record.vol_desc)}
+                {renderIndicator('LIQ', record.liq_score, record.liq_desc)}
               </>
             ) : (
               <>
-                <div>MACD: {record.macd ?? 'N/A'}</div>
-                <div>BOX: {record.box_score ?? 'N/A'}</div>
-                <div>VOL: {record.vol_score ?? 'N/A'}</div>
-                <div>FIB: {record.fib_score ?? 'N/A'}</div>
+                {renderIndicator('MACD', record.macd, record.macd_desc)}
+                {renderIndicator('BOX', record.box_score, record.box_desc)}
+                {renderIndicator('VOL', record.vol_score, record.vol_desc)}
+                {renderIndicator('FIB', record.fib_score, record.fib_desc)}
               </>
             )}
           </div>
         );
       },
-      width: 140,
+      width: 180,
     },
     {
       title: 'Reason',
