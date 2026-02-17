@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import Keycloak from 'keycloak-js';
 
 const KeycloakContext = createContext();
@@ -15,16 +15,17 @@ export const KeycloakProvider = ({ children }) => {
   const [keycloak, setKeycloak] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [initialized, setInitialized] = useState(false);
-  const isInitializing = useRef(false);
 
   useEffect(() => {
-    // Prevent double initialization
-    if (isInitializing.current) {
-      console.log('[KeycloakContext] Already initializing, skipping...');
+    // Reuse existing Keycloak instance if available
+    if (window._keycloakInstance) {
+      console.log('[KeycloakContext] Reusing existing Keycloak instance');
+      setKeycloak(window._keycloakInstance);
+      setAuthenticated(!!window._keycloakInstance.token);
+      setInitialized(true);
       return;
     }
 
-    isInitializing.current = true;
     console.log('[KeycloakContext] Initializing Keycloak...');
 
     const redirectUri = window.location.origin + '/';
@@ -35,6 +36,9 @@ export const KeycloakProvider = ({ children }) => {
       realm: 'trading',
       clientId: 'trading-frontend',
     });
+
+    // Store instance globally to prevent re-initialization
+    window._keycloakInstance = kc;
 
     console.log('[KeycloakContext] Config:', {
       url: kc.authServerUrl,
