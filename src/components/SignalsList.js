@@ -113,6 +113,11 @@ const SignalsList = () => {
                   <strong style={{ fontSize: '16px' }}>{signal.ticker}</strong>
                   {signal.signal && <Tag color={signal.signal === 'BUY' ? 'green' : 'red'}>{signal.signal}</Tag>}
                 </div>
+                {signal.company && (
+                  <div style={{ fontSize: '12px', color: '#333', marginBottom: '2px', fontWeight: '500' }}>
+                    {signal.company.length > 30 ? signal.company.substring(0, 30) + '...' : signal.company}
+                  </div>
+                )}
                 <div style={{ fontSize: '12px', color: '#666' }}>
                   {dayjs(signal.timestamp).format('YYYY-MM-DD HH:mm')}
                 </div>
@@ -186,6 +191,13 @@ const SignalsList = () => {
       key: 'ticker',
       render: (text) => <strong>{text}</strong>,
       width: 100,
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company',
+      key: 'company',
+      ellipsis: true,
+      width: 180,
     },
     {
       title: 'Signal',
