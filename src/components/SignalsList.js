@@ -63,9 +63,28 @@ const SignalsList = () => {
       ticker: signal.ticker,
       direction: signal.signal === 'BUY' ? 'LONG' : 'SHORT',
       entry_price: signal.price,
-      quantity: 1,
+      quantity: 0.01,
+      amount: null,
     });
     setTradeModalVisible(true);
+  };
+
+  // Calculate quantity from dollar amount
+  const handleAmountChange = (amount) => {
+    const entryPrice = form.getFieldValue('entry_price');
+    if (amount && entryPrice && entryPrice > 0) {
+      const calculatedQuantity = amount / entryPrice;
+      form.setFieldsValue({ quantity: parseFloat(calculatedQuantity.toFixed(4)) });
+    }
+  };
+
+  // Calculate amount from quantity
+  const handleQuantityChange = (quantity) => {
+    const entryPrice = form.getFieldValue('entry_price');
+    if (quantity && entryPrice && entryPrice > 0) {
+      const calculatedAmount = quantity * entryPrice;
+      form.setFieldsValue({ amount: parseFloat(calculatedAmount.toFixed(2)) });
+    }
   };
 
   const handleSubmitTrade = async (values) => {
@@ -400,10 +419,11 @@ const SignalsList = () => {
             label="Direction"
             name="direction"
             rules={[{ required: true, message: 'Please select direction' }]}
+            help="You can choose any direction regardless of the signal"
           >
             <Select>
-              <Option value="LONG">LONG</Option>
-              <Option value="SHORT">SHORT</Option>
+              <Option value="LONG">LONG (Buy)</Option>
+              <Option value="SHORT">SHORT (Sell)</Option>
             </Select>
           </Form.Item>
 
@@ -421,15 +441,33 @@ const SignalsList = () => {
           </Form.Item>
 
           <Form.Item
-            label="Quantity"
-            name="quantity"
-            rules={[{ required: true, message: 'Please enter quantity' }]}
+            label="Amount ($)"
+            name="amount"
+            help="Optional: Enter dollar amount to auto-calculate quantity"
           >
             <InputNumber
               style={{ width: '100%' }}
               precision={2}
-              min={0.01}
-              step={1}
+              min={0}
+              step={100}
+              placeholder="e.g., 1000"
+              onChange={handleAmountChange}
+              prefix="$"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Quantity"
+            name="quantity"
+            rules={[{ required: true, message: 'Please enter quantity' }]}
+            help="Supports fractional values (e.g., 0.5, 0.01)"
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              precision={4}
+              min={0.0001}
+              step={0.01}
+              onChange={handleQuantityChange}
             />
           </Form.Item>
 
