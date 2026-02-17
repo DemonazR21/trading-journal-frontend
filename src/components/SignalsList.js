@@ -28,13 +28,22 @@ const SignalsList = () => {
     try {
       setLoading(true);
       const params = {};
-      if (filters.monitor_type) params.monitor_type = filters.monitor_type;
+      if (filters.monitor_type) params.source = filters.monitor_type.toLowerCase();
       if (filters.ticker) params.ticker = filters.ticker;
       if (filters.signal) params.signal = filters.signal;
       if (filters.limit) params.limit = filters.limit;
 
       const response = await api.getSignals(params);
-      setSignals(response.data);
+
+      // Transform backend data to frontend format
+      const transformedData = response.data.map(signal => ({
+        ...signal,
+        monitor_type: signal.source ? signal.source.toUpperCase() : null,
+        price: signal.current_price,
+        timestamp: signal.created_at,
+      }));
+
+      setSignals(transformedData);
     } catch (error) {
       console.error('Failed to load signals:', error);
       message.error('Failed to load signals');
