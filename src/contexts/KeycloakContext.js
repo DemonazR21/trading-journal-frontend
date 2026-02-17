@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import Keycloak from 'keycloak-js';
+import keycloakInstance from '../keycloak';
 
 const KeycloakContext = createContext();
 
@@ -19,22 +19,10 @@ export const KeycloakProvider = ({ children }) => {
   useEffect(() => {
     console.log('[KeycloakContext] Initializing...');
 
-    // Create Keycloak instance
-    const keycloakConfig = {
-      realm: 'trading',
-      clientId: 'trading-frontend',
-      url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.uat.lan',
-    };
+    // Use the shared Keycloak instance
+    const kc = keycloakInstance;
 
-    console.log('[KeycloakContext] Creating Keycloak with config:', keycloakConfig);
-
-    const kc = new Keycloak(keycloakConfig);
-
-    console.log('[KeycloakContext] Keycloak instance created:', {
-      authServerUrl: kc.authServerUrl,
-      realm: kc.realm,
-      clientId: kc.clientId,
-    });
+    console.log('[KeycloakContext] Using shared Keycloak instance');
 
     // Initialize Keycloak
     kc.init({
