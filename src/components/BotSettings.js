@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Switch, Slider, InputNumber, Button, Space, Typography,
+  Card, Switch, Slider, InputNumber, Button, Space, Typography, Input,
   Row, Col, Spin, message, Tag, Table, Tabs, Divider, Alert
 } from 'antd';
 import {
   RobotOutlined, SettingOutlined, HistoryOutlined,
-  CheckCircleOutlined, StopOutlined
+  CheckCircleOutlined, StopOutlined, KeyOutlined, SafetyOutlined
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import dayjs from 'dayjs';
@@ -37,6 +37,100 @@ const BOT_DEFINITIONS = [
     showLeverage: true,
   },
 ];
+
+function ApiKeysSection({ botName }) {
+  const [keyInfo, setKeyInfo] = useState({ has_keys: false, api_key_masked: '' });
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    api.getBotKeys(botName)
+      .then(res => setKeyInfo(res.data))
+      .catch(() => {});
+  }, [botName]);
+
+  const handleSave = async () => {
+    if (!apiKey || !apiSecret) {
+      message.warning('Both API Key and Secret are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.saveBotKeys(botName, { api_key: apiKey, api_secret: apiSecret });
+      setKeyInfo(res.data);
+      setApiKey('');
+      setApiSecret('');
+      setEditing(false);
+      message.success('API keys saved to Vault');
+    } catch (err) {
+      message.error(`Failed to save keys: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, marginTop: 8 }}>
+      <Space style={{ marginBottom: 12 }}>
+        <KeyOutlined />
+        <Text strong>API Keys</Text>
+        {keyInfo.has_keys ? (
+          <Tag icon={<SafetyOutlined />} color="green">Stored in Vault</Tag>
+        ) : (
+          <Tag color="warning">Not configured</Tag>
+        )}
+      </Space>
+
+      {keyInfo.has_keys && !editing && (
+        <div>
+          <Text type="secondary">Key: {keyInfo.api_key_masked}</Text>
+          <Button type="link" size="small" onClick={() => setEditing(true)} style={{ marginLeft: 8 }}>
+            Update
+          </Button>
+        </div>
+      )}
+
+      {(!keyInfo.has_keys || editing) && (
+        <Row gutter={[12, 12]}>
+          <Col xs={24} sm={12}>
+            <Input.Password
+              placeholder="API Key"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+            />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Input.Password
+              placeholder="API Secret"
+              value={apiSecret}
+              onChange={e => setApiSecret(e.target.value)}
+            />
+          </Col>
+          <Col xs={24}>
+            <Space>
+              <Button
+                type="primary"
+                icon={<SafetyOutlined />}
+                onClick={handleSave}
+                loading={saving}
+                size="small"
+              >
+                Save to Vault
+              </Button>
+              {editing && (
+                <Button size="small" onClick={() => { setEditing(false); setApiKey(''); setApiSecret(''); }}>
+                  Cancel
+                </Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      )}
+    </div>
+  );
+}
 
 function BotConfigCard({ botDef, config, onSave, saving }) {
   const [form, setForm] = useState({ ...DEFAULT_CONFIG, ...config });
@@ -154,6 +248,9 @@ function BotConfigCard({ botDef, config, onSave, saving }) {
           Save Settings
         </Button>
       </div>
+
+      <Divider style={{ margin: '16px 0 8px' }} />
+      <ApiKeysSection botName={botDef.name} />
     </Card>
   );
 }
@@ -283,7 +380,7 @@ function BotSettings() {
         <>
           <Alert
             message="Bot Configuration"
-            description="Configure your automated trading bots. Changes take effect within 60 seconds. UAT bots trade on Binance testnet with fake money."
+            description="Configure your automated trading bots. Changes take effect within 60 seconds. API keys are stored securely in HashiCorp Vault."
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
