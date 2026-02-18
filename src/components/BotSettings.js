@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Switch, Slider, InputNumber, Button, Space, Typography, Input,
-  Row, Col, Spin, message, Tag, Table, Tabs, Divider, Alert
+  Card, Switch, Slider, InputNumber, Button, Space, Typography, Input, Statistic,
+  Row, Col, Spin, message, Tag, Table, Tabs, Divider, Alert, Empty
 } from 'antd';
 import {
-  RobotOutlined, SettingOutlined, HistoryOutlined,
-  CheckCircleOutlined, StopOutlined, KeyOutlined, SafetyOutlined
+  RobotOutlined, SettingOutlined, HistoryOutlined, BarChartOutlined,
+  CheckCircleOutlined, StopOutlined, KeyOutlined, SafetyOutlined,
+  ArrowUpOutlined, ArrowDownOutlined, TrophyOutlined, DollarOutlined
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import dayjs from 'dayjs';
@@ -335,6 +336,136 @@ function BotTradesTable() {
   );
 }
 
+function BotStatsPanel() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getBotStats()
+      .then(res => setStats(res.data))
+      .catch(() => message.error('Failed to load bot stats'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
+  if (!stats || !stats.overall || !stats.overall.total_trades) {
+    return <Empty description="No bot trades yet - statistics will appear after the first trade" />;
+  }
+
+  const { overall, daily, by_ticker, per_bot } = stats;
+  const pnlColor = overall.total_pnl >= 0 ? '#3f8600' : '#cf1322';
+
+  const dailyColumns = [
+    { title: 'Date', dataIndex: 'date', key: 'date', width: 110 },
+    { title: 'Trades', dataIndex: 'trades', key: 'trades', width: 70 },
+    { title: 'Wins', dataIndex: 'wins', key: 'wins', width: 60,
+      render: v => <Text type="success">{v}</Text> },
+    { title: 'Losses', dataIndex: 'losses', key: 'losses', width: 70,
+      render: v => <Text type="danger">{v}</Text> },
+    { title: 'P&L', dataIndex: 'daily_pnl', key: 'daily_pnl',
+      render: v => (
+        <Text style={{ color: v >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>
+          {v >= 0 ? '+' : ''}${v.toFixed(2)}
+        </Text>
+      )},
+  ];
+
+  const tickerColumns = [
+    { title: 'Ticker', dataIndex: 'ticker', key: 'ticker',
+      render: v => <Text strong>{v}</Text> },
+    { title: 'Trades', dataIndex: 'trades', key: 'trades', width: 70 },
+    { title: 'Wins', dataIndex: 'wins', key: 'wins', width: 60 },
+    { title: 'P&L', dataIndex: 'ticker_pnl', key: 'ticker_pnl',
+      render: v => (
+        <Text style={{ color: v >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>
+          {v >= 0 ? '+' : ''}${v.toFixed(2)}
+        </Text>
+      )},
+  ];
+
+  const botColumns = [
+    { title: 'Bot', dataIndex: 'bot_name', key: 'bot_name', render: v => <Tag>{v}</Tag> },
+    { title: 'Type', dataIndex: 'trade_type', key: 'trade_type',
+      render: v => <Tag color={v === 'SPOT' ? 'blue' : 'purple'}>{v}</Tag> },
+    { title: 'Total', dataIndex: 'total_trades', key: 'total_trades', width: 60 },
+    { title: 'Open', dataIndex: 'open_trades', key: 'open_trades', width: 60 },
+    { title: 'Closed', dataIndex: 'closed_trades', key: 'closed_trades', width: 70 },
+    { title: 'Win Rate', dataIndex: 'win_rate', key: 'win_rate', width: 80,
+      render: v => v != null ? `${v}%` : '-' },
+    { title: 'P&L', dataIndex: 'total_pnl', key: 'total_pnl',
+      render: v => (
+        <Text style={{ color: v >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>
+          {v >= 0 ? '+' : ''}${v.toFixed(2)}
+        </Text>
+      )},
+  ];
+
+  return (
+    <>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic
+              title="Total P&L"
+              value={overall.total_pnl}
+              precision={2}
+              prefix={<DollarOutlined />}
+              valueStyle={{ color: pnlColor }}
+              suffix={overall.total_pnl >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="Win Rate" value={overall.win_rate} suffix="%" prefix={<TrophyOutlined />}
+              valueStyle={{ color: overall.win_rate >= 50 ? '#3f8600' : '#cf1322' }} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="Total Trades" value={overall.total_trades} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {overall.open_trades} open / {overall.closed_trades} closed
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="Best Trade" value={overall.best_trade} precision={2} prefix="$"
+              valueStyle={{ color: '#3f8600' }} />
+            <Statistic title="Worst Trade" value={overall.worst_trade} precision={2} prefix="$"
+              valueStyle={{ color: '#cf1322', fontSize: 14, marginTop: 4 }} />
+          </Card>
+        </Col>
+      </Row>
+
+      {per_bot.length > 0 && (
+        <Card title="Per Bot Performance" size="small" style={{ marginBottom: 16 }}>
+          <Table dataSource={per_bot} columns={botColumns} rowKey="bot_name"
+            size="small" pagination={false} />
+        </Card>
+      )}
+
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Card title="Daily P&L (Last 30 Days)" size="small" style={{ marginBottom: 16 }}>
+            <Table dataSource={daily} columns={dailyColumns} rowKey="date"
+              size="small" pagination={{ pageSize: 10 }}
+              locale={{ emptyText: 'No closed trades yet' }} />
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card title="P&L by Ticker" size="small" style={{ marginBottom: 16 }}>
+            <Table dataSource={by_ticker} columns={tickerColumns} rowKey="ticker"
+              size="small" pagination={{ pageSize: 10 }}
+              locale={{ emptyText: 'No closed trades yet' }} />
+          </Card>
+        </Col>
+      </Row>
+    </>
+  );
+}
+
 function BotSettings() {
   const [configs, setConfigs] = useState({});
   const [loading, setLoading] = useState(true);
@@ -396,6 +527,11 @@ function BotSettings() {
           ))}
         </>
       ),
+    },
+    {
+      key: 'stats',
+      label: <span><BarChartOutlined /> Statistics</span>,
+      children: <BotStatsPanel />,
     },
     {
       key: 'trades',

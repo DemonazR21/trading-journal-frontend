@@ -79,4 +79,5 @@ export const api = {
   getBotTrades: (params = {}) => apiClient.get('/bot-trades', { params }),
   getBotKeys: (botName) => apiClient.get(`/bot-config/${botName}/keys`),
   saveBotKeys: (botName, data) => apiClient.put(`/bot-config/${botName}/keys`, data),
+  getBotStats: (params = {}) => apiClient.get('/bot-stats', { params }),
 };
