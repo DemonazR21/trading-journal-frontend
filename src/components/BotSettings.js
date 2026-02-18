@@ -303,7 +303,27 @@ function BotTradesTable() {
       title: 'Entry',
       dataIndex: 'entry_price',
       key: 'entry_price',
-      render: v => v ? `$${parseFloat(v).toFixed(2)}` : '-',
+      render: v => v ? `$${parseFloat(v).toFixed(4)}` : '-',
+    },
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      render: (v, record) => {
+        if (!v) return '-';
+        const qty = parseFloat(v);
+        const coin = record.ticker ? record.ticker.replace('-USD', '') : '';
+        return <span>{qty < 1 ? qty.toFixed(6) : qty < 100 ? qty.toFixed(2) : qty.toFixed(0)} <Text type="secondary">{coin}</Text></span>;
+      },
+    },
+    {
+      title: 'Value',
+      key: 'value',
+      render: (_, record) => {
+        if (!record.quantity || !record.entry_price) return '-';
+        const val = parseFloat(record.quantity) * parseFloat(record.entry_price);
+        return `$${val.toFixed(2)}`;
+      },
     },
     {
       title: 'P&L',
