@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Switch, Slider, InputNumber, Button, Space, Typography, Input, Statistic,
-  Row, Col, Spin, message, Tag, Table, Tabs, Divider, Alert, Empty
+  Row, Col, Spin, message, Tag, Table, Tabs, Divider, Alert, Empty, Modal, Form, Tooltip
 } from 'antd';
 import {
   RobotOutlined, SettingOutlined, HistoryOutlined, BarChartOutlined,
   CheckCircleOutlined, StopOutlined, KeyOutlined, SafetyOutlined,
-  ArrowUpOutlined, ArrowDownOutlined, TrophyOutlined, DollarOutlined
+  ArrowUpOutlined, ArrowDownOutlined, TrophyOutlined, DollarOutlined,
+  EditOutlined, WalletOutlined
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import dayjs from 'dayjs';
@@ -256,16 +257,89 @@ function BotConfigCard({ botDef, config, onSave, saving }) {
   );
 }
 
+function BotBalanceCards() {
+  const [balances, setBalances] = useState([]);
+
+  useEffect(() => {
+    api.getBotBalances()
+      .then(res => setBalances(res.data))
+      .catch(() => {});
+  }, []);
+
+  if (!balances.length) return null;
+
+  return (
+    <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+      {balances.map(b => (
+        <Col xs={24} sm={12} key={b.bot_name}>
+          <Card size="small">
+            <Statistic
+              title={<span><WalletOutlined /> {b.bot_name}</span>}
+              value={b.balance}
+              precision={2}
+              prefix="$"
+              suffix="USDT"
+              valueStyle={{ color: '#1890ff' }}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {b.open_positions} open positions | Updated {dayjs(b.updated_at).format('HH:mm:ss')}
+            </Text>
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+}
+
 function BotTradesTable() {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingTrade, setEditingTrade] = useState(null);
+  const [editForm] = Form.useForm();
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const loadTrades = useCallback(() => {
+    setLoading(true);
     api.getBotTrades({ limit: 50 })
       .then(res => setTrades(res.data))
       .catch(() => message.error('Failed to load bot trades'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadTrades(); }, [loadTrades]);
+
+  const handleEdit = (record) => {
+    setEditingTrade(record);
+    editForm.setFieldsValue({
+      stop_loss: record.stop_loss ? parseFloat(record.stop_loss) : null,
+      target_1: record.target_1 ? parseFloat(record.target_1) : null,
+      target_2: record.target_2 ? parseFloat(record.target_2) : null,
+      target_3: record.target_3 ? parseFloat(record.target_3) : null,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      const values = await editForm.validateFields();
+      setSaving(true);
+      await api.updateBotTrade(editingTrade.id, values);
+      message.success('Trade targets updated');
+      setEditingTrade(null);
+      loadTrades();
+    } catch (err) {
+      if (err.response) {
+        message.error(`Failed: ${err.response?.data?.detail || err.message}`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fmtPrice = (v) => {
+    if (!v) return '-';
+    const p = parseFloat(v);
+    return p < 1 ? `$${p.toFixed(6)}` : p < 10 ? `$${p.toFixed(4)}` : `$${p.toFixed(2)}`;
+  };
 
   const columns = [
     {
@@ -276,34 +350,16 @@ function BotTradesTable() {
       width: 100,
     },
     {
-      title: 'Bot',
-      dataIndex: 'bot_name',
-      key: 'bot_name',
-      render: v => <Tag>{v}</Tag>,
-    },
-    {
-      title: 'Type',
-      dataIndex: 'trade_type',
-      key: 'trade_type',
-      render: v => <Tag color={v === 'SPOT' ? 'blue' : 'purple'}>{v}</Tag>,
-    },
-    {
       title: 'Ticker',
       dataIndex: 'ticker',
       key: 'ticker',
-      render: v => <Text strong>{v}</Text>,
-    },
-    {
-      title: 'Direction',
-      dataIndex: 'direction',
-      key: 'direction',
-      render: v => <Tag color={v === 'LONG' ? 'green' : 'red'}>{v}</Tag>,
+      render: (v, r) => <span><Text strong>{v}</Text> <Tag color={r.direction === 'LONG' ? 'green' : 'red'} style={{fontSize: 10}}>{r.direction}</Tag></span>,
     },
     {
       title: 'Entry',
       dataIndex: 'entry_price',
       key: 'entry_price',
-      render: v => v ? `$${parseFloat(v).toFixed(4)}` : '-',
+      render: fmtPrice,
     },
     {
       title: 'Quantity',
@@ -326,6 +382,22 @@ function BotTradesTable() {
       },
     },
     {
+      title: 'SL',
+      dataIndex: 'stop_loss',
+      key: 'stop_loss',
+      render: v => v ? <Text type="danger">{fmtPrice(v)}</Text> : '-',
+    },
+    {
+      title: 'TP1 / TP2 / TP3',
+      key: 'targets',
+      render: (_, r) => {
+        const t1 = r.target_1 ? fmtPrice(r.target_1) : '-';
+        const t2 = r.target_2 ? fmtPrice(r.target_2) : '-';
+        const t3 = r.target_3 ? fmtPrice(r.target_3) : '-';
+        return <Text type="success" style={{fontSize: 12}}>{t1} / {t2} / {t3}</Text>;
+      },
+    },
+    {
       title: 'P&L',
       dataIndex: 'pnl',
       key: 'pnl',
@@ -341,18 +413,62 @@ function BotTradesTable() {
       key: 'status',
       render: v => <Tag color={v === 'OPEN' ? 'processing' : v === 'CLOSED' ? 'default' : 'warning'}>{v}</Tag>,
     },
+    {
+      title: '',
+      key: 'actions',
+      width: 40,
+      render: (_, record) => record.status === 'OPEN' ? (
+        <Tooltip title="Edit SL / TP">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+        </Tooltip>
+      ) : null,
+    },
   ];
 
   return (
-    <Table
-      dataSource={trades}
-      columns={columns}
-      rowKey="id"
-      loading={loading}
-      size="small"
-      pagination={{ pageSize: 20 }}
-      locale={{ emptyText: 'No bot trades yet' }}
-    />
+    <>
+      <BotBalanceCards />
+      <Table
+        dataSource={trades}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        size="small"
+        pagination={{ pageSize: 20 }}
+        locale={{ emptyText: 'No bot trades yet' }}
+        scroll={{ x: 900 }}
+      />
+      <Modal
+        title={editingTrade ? `Edit SL/TP - ${editingTrade.ticker} ${editingTrade.direction}` : 'Edit Trade'}
+        open={!!editingTrade}
+        onOk={handleSaveEdit}
+        onCancel={() => setEditingTrade(null)}
+        confirmLoading={saving}
+        okText="Save"
+      >
+        {editingTrade && (
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              Entry: {fmtPrice(editingTrade.entry_price)} | Qty: {parseFloat(editingTrade.quantity || 0).toFixed(4)}
+            </Text>
+          </div>
+        )}
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="stop_loss" label="Stop Loss">
+            <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="Stop Loss price" />
+          </Form.Item>
+          <Form.Item name="target_1" label="Take Profit 1">
+            <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP1 price" />
+          </Form.Item>
+          <Form.Item name="target_2" label="Take Profit 2">
+            <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP2 price" />
+          </Form.Item>
+          <Form.Item name="target_3" label="Take Profit 3">
+            <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP3 price" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 }
 
