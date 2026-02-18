@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import SignalsList from './components/SignalsList';
 import TradesHistory from './components/TradesHistory';
 import Stats from './components/Stats';
+import BotSettings from './components/BotSettings';
 import KeycloakDebug from './components/KeycloakDebug';
 
 function LoginScreen() {
@@ -64,6 +65,7 @@ function App() {
         <Route path="/signals" element={<SignalsList />} />
         <Route path="/trades" element={<TradesHistory />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/bot-settings" element={<BotSettings />} />
         <Route path="/debug" element={<KeycloakDebug />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

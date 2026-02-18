@@ -7,6 +7,7 @@ import {
   SignalFilled,
   DollarOutlined,
   BarChartOutlined,
+  RobotOutlined,
   LogoutOutlined,
   MenuOutlined,
 } from '@ant-design/icons';
@@ -43,6 +44,11 @@ const Layout = ({ children }) => {
       key: '/stats',
       icon: <BarChartOutlined />,
       label: 'Statistics',
+    },
+    {
+      key: '/bot-settings',
+      icon: <RobotOutlined />,
+      label: 'Bots',
     },
   ];
 

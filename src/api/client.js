@@ -72,4 +72,9 @@ export const api = {
 
   // User
   getCurrentUser: () => apiClient.get('/user'),
+
+  // Bot Config
+  getBotConfigs: () => apiClient.get('/bot-config'),
+  updateBotConfig: (botName, data) => apiClient.put(`/bot-config/${botName}`, data),
+  getBotTrades: (params = {}) => apiClient.get('/bot-trades', { params }),
 };
