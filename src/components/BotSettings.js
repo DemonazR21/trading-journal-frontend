@@ -7,7 +7,7 @@ import {
   RobotOutlined, SettingOutlined, HistoryOutlined, BarChartOutlined,
   CheckCircleOutlined, StopOutlined, KeyOutlined, SafetyOutlined,
   ArrowUpOutlined, ArrowDownOutlined, TrophyOutlined, DollarOutlined,
-  EditOutlined, WalletOutlined
+  EditOutlined, WalletOutlined, SyncOutlined, LoadingOutlined
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import dayjs from 'dayjs';
@@ -324,16 +324,15 @@ function BotTradesTable() {
   const handleClose = async (record) => {
     Modal.confirm({
       title: `Close ${record.ticker} ${record.direction}?`,
-      content: `This will close the trade at current market price.`,
+      content: `The bot will execute a market close order on Binance on its next cycle (within ~60s).`,
       okText: 'Close Trade',
       okType: 'danger',
       onOk: async () => {
         setClosing(record.id);
         try {
-          const res = await api.closeBotTrade(record.id);
-          message.success(`Trade closed at $${res.data.exit_price.toFixed(4)}`);
+          await api.closeBotTrade(record.id);
+          message.success('Close request sent — bot will execute on Binance shortly');
           loadTrades();
-          loadPrices();
         } catch (err) {
           message.error(`Failed: ${err.response?.data?.detail || err.message}`);
         } finally {
@@ -343,7 +342,12 @@ function BotTradesTable() {
     });
   };
 
-  useEffect(() => { loadTrades(); }, [loadTrades]);
+  useEffect(() => {
+    loadTrades();
+    // Auto-refresh trades every 15s to pick up CLOSING→CLOSED and pending_update changes
+    const interval = setInterval(loadTrades, 15000);
+    return () => clearInterval(interval);
+  }, [loadTrades]);
 
   const handleEdit = (record) => {
     setEditingTrade(record);
@@ -478,7 +482,11 @@ function BotTradesTable() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: v => <Tag color={v === 'OPEN' ? 'processing' : v === 'CLOSED' ? 'default' : 'warning'}>{v}</Tag>,
+      render: (v, record) => {
+        if (v === 'CLOSING') return <Tag icon={<LoadingOutlined />} color="orange">CLOSING</Tag>;
+        if (v === 'OPEN' && record.pending_update) return <Tag icon={<SyncOutlined spin />} color="processing">UPDATING</Tag>;
+        return <Tag color={v === 'OPEN' ? 'processing' : v === 'CLOSED' ? 'default' : 'warning'}>{v}</Tag>;
+      },
     },
     {
       title: '',
@@ -486,15 +494,17 @@ function BotTradesTable() {
       width: 80,
       render: (_, record) => record.status === 'OPEN' ? (
         <Space size={4}>
-          <Tooltip title="Edit SL / TP">
+          <Tooltip title="Edit SL / TP (will update on Binance)">
             <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
           </Tooltip>
-          <Tooltip title="Close trade">
+          <Tooltip title="Close trade on Binance">
             <Button type="text" size="small" danger loading={closing === record.id} onClick={() => handleClose(record)}>
               Close
             </Button>
           </Tooltip>
         </Space>
+      ) : record.status === 'CLOSING' ? (
+        <Text type="secondary" style={{ fontSize: 11 }}>Sending...</Text>
       ) : null,
     },
   ];
@@ -513,31 +523,39 @@ function BotTradesTable() {
         scroll={{ x: 900 }}
       />
       <Modal
-        title={editingTrade ? `Edit SL/TP - ${editingTrade.ticker} ${editingTrade.direction}` : 'Edit Trade'}
+        title={editingTrade ? `Edit SL/TP — ${editingTrade.ticker} ${editingTrade.direction}` : 'Edit Trade'}
         open={!!editingTrade}
         onOk={handleSaveEdit}
         onCancel={() => setEditingTrade(null)}
         confirmLoading={saving}
-        okText="Save"
+        okText="Save & Update Binance"
       >
         {editingTrade && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 12 }}>
             <Text type="secondary">
               Entry: {fmtPrice(editingTrade.entry_price)} | Qty: {parseFloat(editingTrade.quantity || 0).toFixed(4)}
             </Text>
+            <div style={{ marginTop: 8 }}>
+              <Alert
+                type="info"
+                showIcon
+                style={{ fontSize: 12 }}
+                message="Saving will cancel existing Binance orders and place new ones on the next bot cycle (~60s). All 3 TPs are split 33%/33%/34% of position."
+              />
+            </div>
           </div>
         )}
-        <Form form={editForm} layout="vertical">
+        <Form form={editForm} layout="vertical" style={{ marginTop: 12 }}>
           <Form.Item name="stop_loss" label="Stop Loss">
             <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="Stop Loss price" />
           </Form.Item>
-          <Form.Item name="target_1" label="Take Profit 1">
+          <Form.Item name="target_1" label="Take Profit 1 (33% of position)">
             <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP1 price" />
           </Form.Item>
-          <Form.Item name="target_2" label="Take Profit 2">
+          <Form.Item name="target_2" label="Take Profit 2 (33% of position)">
             <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP2 price" />
           </Form.Item>
-          <Form.Item name="target_3" label="Take Profit 3">
+          <Form.Item name="target_3" label="Take Profit 3 (34% of position)">
             <InputNumber style={{ width: '100%' }} step={0.0001} min={0} placeholder="TP3 price" />
           </Form.Item>
         </Form>
