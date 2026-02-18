@@ -82,4 +82,6 @@ export const api = {
   getBotStats: (params = {}) => apiClient.get('/bot-stats', { params }),
   getBotBalances: () => apiClient.get('/bot-balances'),
   updateBotTrade: (tradeId, data) => apiClient.put(`/bot-trades/${tradeId}`, data),
+  getBotPrices: () => apiClient.get('/bot-prices'),
+  closeBotTrade: (tradeId) => apiClient.post(`/bot-trades/${tradeId}/close`),
 };

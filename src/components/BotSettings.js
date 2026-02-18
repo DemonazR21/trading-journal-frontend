@@ -297,6 +297,8 @@ function BotTradesTable() {
   const [editingTrade, setEditingTrade] = useState(null);
   const [editForm] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [prices, setPrices] = useState({});
+  const [closing, setClosing] = useState(null);
 
   const loadTrades = useCallback(() => {
     setLoading(true);
@@ -305,6 +307,41 @@ function BotTradesTable() {
       .catch(() => message.error('Failed to load bot trades'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Fetch live prices every 30 seconds
+  const loadPrices = useCallback(() => {
+    api.getBotPrices()
+      .then(res => setPrices(res.data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadPrices();
+    const interval = setInterval(loadPrices, 30000);
+    return () => clearInterval(interval);
+  }, [loadPrices]);
+
+  const handleClose = async (record) => {
+    Modal.confirm({
+      title: `Close ${record.ticker} ${record.direction}?`,
+      content: `This will close the trade at current market price.`,
+      okText: 'Close Trade',
+      okType: 'danger',
+      onOk: async () => {
+        setClosing(record.id);
+        try {
+          const res = await api.closeBotTrade(record.id);
+          message.success(`Trade closed at $${res.data.exit_price.toFixed(4)}`);
+          loadTrades();
+          loadPrices();
+        } catch (err) {
+          message.error(`Failed: ${err.response?.data?.detail || err.message}`);
+        } finally {
+          setClosing(null);
+        }
+      },
+    });
+  };
 
   useEffect(() => { loadTrades(); }, [loadTrades]);
 
@@ -398,14 +435,44 @@ function BotTradesTable() {
       },
     },
     {
+      title: 'Current',
+      key: 'current_price',
+      render: (_, record) => {
+        if (record.status !== 'OPEN') return record.exit_price ? fmtPrice(record.exit_price) : '-';
+        const cp = prices[record.ticker];
+        return cp ? <Text>{fmtPrice(cp)}</Text> : <Text type="secondary">...</Text>;
+      },
+    },
+    {
       title: 'P&L',
-      dataIndex: 'pnl',
       key: 'pnl',
-      render: v => v ? (
-        <Text type={parseFloat(v) >= 0 ? 'success' : 'danger'}>
-          ${parseFloat(v).toFixed(2)}
-        </Text>
-      ) : '-',
+      render: (_, record) => {
+        if (record.status === 'CLOSED' && record.pnl != null) {
+          const pnl = parseFloat(record.pnl);
+          return <Text style={{ color: pnl >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>${pnl.toFixed(2)}</Text>;
+        }
+        if (record.status === 'OPEN' && record.entry_price && record.quantity) {
+          const cp = prices[record.ticker];
+          if (!cp) return '-';
+          const entry = parseFloat(record.entry_price);
+          const qty = parseFloat(record.quantity);
+          const lev = record.leverage || 1;
+          const pnl = record.direction === 'LONG'
+            ? (cp - entry) * qty * lev
+            : (entry - cp) * qty * lev;
+          const pnlPct = record.direction === 'LONG'
+            ? ((cp - entry) / entry * 100)
+            : ((entry - cp) / entry * 100);
+          return (
+            <Tooltip title={`${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`}>
+              <Text style={{ color: pnl >= 0 ? '#3f8600' : '#cf1322', fontWeight: 'bold' }}>
+                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+              </Text>
+            </Tooltip>
+          );
+        }
+        return '-';
+      },
     },
     {
       title: 'Status',
@@ -416,11 +483,18 @@ function BotTradesTable() {
     {
       title: '',
       key: 'actions',
-      width: 40,
+      width: 80,
       render: (_, record) => record.status === 'OPEN' ? (
-        <Tooltip title="Edit SL / TP">
-          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-        </Tooltip>
+        <Space size={4}>
+          <Tooltip title="Edit SL / TP">
+            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          </Tooltip>
+          <Tooltip title="Close trade">
+            <Button type="text" size="small" danger loading={closing === record.id} onClick={() => handleClose(record)}>
+              Close
+            </Button>
+          </Tooltip>
+        </Space>
       ) : null,
     },
   ];
