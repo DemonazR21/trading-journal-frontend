@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
   balance_utilization: 0.95,
   risk_per_trade: 0.02,
   leverage: 10,
+  scalping_mode: false,
 };
 
 const BOT_DEFINITIONS = [
@@ -237,6 +238,26 @@ function BotConfigCard({ botDef, config, onSave, saving }) {
             />
           </Col>
         )}
+        <Col xs={24}>
+          <Divider style={{ margin: '4px 0 12px' }} />
+          <Space align="start">
+            <Switch
+              checked={!!form.scalping_mode}
+              onChange={v => update('scalping_mode', v)}
+              checkedChildren="ON"
+              unCheckedChildren="OFF"
+            />
+            <div>
+              <Text strong>Scalping Mode</Text>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Only use T1 take profit target (close full position at first TP).
+                  Tighter trades, faster turnover.
+                </Text>
+              </div>
+            </div>
+          </Space>
+        </Col>
       </Row>
 
       <div style={{ marginTop: 16, textAlign: 'right' }}>
@@ -299,7 +320,6 @@ function BotTradesTable() {
   const [saving, setSaving] = useState(false);
   const [prices, setPrices] = useState({});
   const [closing, setClosing] = useState(null);
-  const [datafixing, setDatafixing] = useState(false);
 
   const loadTrades = useCallback(() => {
     setLoading(true);
@@ -322,24 +342,6 @@ function BotTradesTable() {
     return () => clearInterval(interval);
   }, [loadPrices]);
 
-  const handleDatafix = async () => {
-    setDatafixing(true);
-    try {
-      const res = await api.datafixBotTrades();
-      const { fixed } = res.data;
-      if (fixed && fixed.length > 0) {
-        message.success(`Reset ${fixed.length} stuck trade(s): ${fixed.map(t => t.ticker).join(', ')}`);
-      } else {
-        message.info('No stuck trades found');
-      }
-      loadTrades();
-    } catch (err) {
-      message.error(`Datafix failed: ${err.response?.data?.detail || err.message}`);
-    } finally {
-      setDatafixing(false);
-    }
-  };
-
   const handleForceClose = async (record) => {
     Modal.confirm({
       title: `Force-close ${record.ticker} in DB?`,
@@ -360,18 +362,19 @@ function BotTradesTable() {
 
   const handleClose = async (record) => {
     Modal.confirm({
-      title: `Close ${record.ticker} ${record.direction}?`,
-      content: `The bot will execute a market close order on Binance on its next cycle (within ~60s).`,
-      okText: 'Close Trade',
+      title: `Close ${record.ticker} ${record.direction} at market?`,
+      content: `A market order will be sent to Binance immediately. The trade will be closed and P&L recorded in real time.`,
+      okText: 'Close Now',
       okType: 'danger',
       onOk: async () => {
         setClosing(record.id);
         try {
-          await api.closeBotTrade(record.id);
-          message.success('Close request sent — bot will execute on Binance shortly');
+          const res = await api.closeBotTrade(record.id);
+          const exitPrice = res.data?.exit_price;
+          message.success(`${record.ticker} closed${exitPrice ? ` @ $${parseFloat(exitPrice).toFixed(4)}` : ''}`);
           loadTrades();
         } catch (err) {
-          message.error(`Failed: ${err.response?.data?.detail || err.message}`);
+          message.error(`Close failed: ${err.response?.data?.detail || err.message}`);
         } finally {
           setClosing(null);
         }
@@ -421,18 +424,20 @@ function BotTradesTable() {
 
   const columns = [
     {
-      title: 'Time',
-      key: 'time',
-      width: 110,
-      render: (_, r) => {
-        const t = r.status === 'CLOSED' && r.exit_time ? r.exit_time : r.entry_time || r.created_at;
-        const label = r.status === 'CLOSED' ? '✕ ' : '↗ ';
-        return (
-          <Tooltip title={r.status === 'CLOSED' ? `Opened: ${dayjs(r.entry_time || r.created_at).format('DD/MM HH:mm')}` : `Opened`}>
-            <Text style={{ fontSize: 12 }}>{label}{dayjs(t).format('DD/MM HH:mm')}</Text>
-          </Tooltip>
-        );
-      },
+      title: 'Opened',
+      key: 'opened',
+      width: 95,
+      render: (_, r) => (
+        <Text style={{ fontSize: 12 }}>{dayjs(r.entry_time || r.created_at).format('DD/MM HH:mm')}</Text>
+      ),
+    },
+    {
+      title: 'Closed',
+      key: 'closed',
+      width: 95,
+      render: (_, r) => r.status === 'CLOSED' && r.exit_time
+        ? <Text style={{ fontSize: 12 }}>{dayjs(r.exit_time).format('DD/MM HH:mm')}</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
     },
     {
       title: 'Bot',
@@ -485,7 +490,7 @@ function BotTradesTable() {
       render: v => v ? <Text type="danger">{fmtPrice(v)}</Text> : '-',
     },
     {
-      title: 'SL / TP',
+      title: 'Targets',
       key: 'targets',
       render: (_, r) => {
         const t1 = r.target_1 ? fmtPrice(r.target_1) : null;
@@ -567,22 +572,13 @@ function BotTradesTable() {
           <Tooltip title="Edit SL / TP (will update on Binance)">
             <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
           </Tooltip>
-          <Tooltip title="Close trade on Binance">
+          <Tooltip title="Close at market price on Binance">
             <Button type="text" size="small" danger loading={closing === record.id} onClick={() => handleClose(record)}>
               Close
             </Button>
           </Tooltip>
-          <Tooltip title="Force-close in DB only (position gone from Binance)">
-            <Button type="text" size="small" style={{ color: '#888', fontSize: 10 }} onClick={() => handleForceClose(record)}>
-              ⚠
-            </Button>
-          </Tooltip>
-        </Space>
-      ) : record.status === 'CLOSING' ? (
-        <Space size={4}>
-          <Text type="secondary" style={{ fontSize: 11 }}>Sending...</Text>
-          <Tooltip title="Force-close in DB (if bot can't close on Binance)">
-            <Button type="text" size="small" style={{ color: '#888', fontSize: 10 }} onClick={() => handleForceClose(record)}>
+          <Tooltip title="Force-close in DB only (position already gone from Binance)">
+            <Button type="text" size="small" style={{ color: '#bbb', fontSize: 10 }} onClick={() => handleForceClose(record)}>
               ⚠
             </Button>
           </Tooltip>
@@ -594,13 +590,6 @@ function BotTradesTable() {
   return (
     <>
       <BotBalanceCards />
-      <div style={{ textAlign: 'right', marginBottom: 8 }}>
-        <Tooltip title="Reset stuck CLOSING trades → OPEN so the Close button reappears">
-          <Button size="small" loading={datafixing} onClick={handleDatafix} style={{ fontSize: 12 }}>
-            🔧 Datafix
-          </Button>
-        </Tooltip>
-      </div>
       <Table
         dataSource={trades}
         columns={columns}
