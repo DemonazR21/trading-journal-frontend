@@ -621,11 +621,21 @@ function BotTradesTable() {
 
 function BotStatsPanel() {
   const [stats, setStats] = useState(null);
+  const [balances, setBalances] = useState([]);
+  const [balHistory, setBalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getBotStats()
-      .then(res => setStats(res.data))
+    Promise.all([
+      api.getBotStats(),
+      api.getBotBalances(),
+      api.getBotBalanceHistory(30),
+    ])
+      .then(([statsRes, balRes, histRes]) => {
+        setStats(statsRes.data);
+        setBalances(balRes.data || []);
+        setBalHistory(histRes.data || []);
+      })
       .catch(() => message.error('Failed to load bot stats'))
       .finally(() => setLoading(false));
   }, []);
@@ -637,6 +647,15 @@ function BotStatsPanel() {
 
   const { overall, daily, by_ticker, per_bot } = stats;
   const pnlColor = overall.total_pnl >= 0 ? '#3f8600' : '#cf1322';
+
+  // Build balance history pivot: [{date, futures, spot}, ...]
+  const balHistoryByDate = {};
+  balHistory.forEach(r => {
+    if (!balHistoryByDate[r.date]) balHistoryByDate[r.date] = { date: r.date };
+    const label = r.bot_name.includes('futures') ? 'futures' : 'spot';
+    balHistoryByDate[r.date][label] = r.balance_usdt;
+  });
+  const balHistoryRows = Object.values(balHistoryByDate).sort((a, b) => b.date.localeCompare(a.date));
 
   const dailyColumns = [
     { title: 'Date', dataIndex: 'date', key: 'date', width: 110 },
@@ -685,6 +704,30 @@ function BotStatsPanel() {
 
   return (
     <>
+      {/* Current Balances (from Binance via bot_state) */}
+      {balances.length > 0 && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          {balances.map(b => (
+            <Col key={b.bot_name} xs={24} sm={12}>
+              <Card size="small" style={{ borderLeft: `4px solid ${b.bot_name.includes('futures') ? '#722ed1' : '#13c2c2'}` }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>{b.bot_name}</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                  <Text strong style={{ fontSize: 22, color: '#1890ff' }}>
+                    ${parseFloat(b.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {b.open_positions} positions
+                  </Text>
+                </div>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Updated {dayjs(b.updated_at).format('HH:mm:ss')}
+                </Text>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Card size="small">
@@ -745,6 +788,38 @@ function BotStatsPanel() {
           </Card>
         </Col>
       </Row>
+
+      {balHistoryRows.length > 0 && (
+        <Card title="Balance History (Last 30 Days — 1 snapshot/hour)" size="small" style={{ marginBottom: 16 }}>
+          <Table
+            dataSource={balHistoryRows}
+            rowKey="date"
+            size="small"
+            pagination={{ pageSize: 10 }}
+            columns={[
+              { title: 'Date', dataIndex: 'date', key: 'date', width: 110 },
+              { title: 'Futures Balance', dataIndex: 'futures', key: 'futures',
+                render: v => v != null
+                  ? <Text style={{ color: '#722ed1', fontWeight: 'bold' }}>${parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  : <Text type="secondary">—</Text>
+              },
+              { title: 'Spot Balance', dataIndex: 'spot', key: 'spot',
+                render: v => v != null
+                  ? <Text style={{ color: '#13c2c2', fontWeight: 'bold' }}>${parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  : <Text type="secondary">—</Text>
+              },
+              { title: 'Total', key: 'total',
+                render: (_, r) => {
+                  const total = (r.futures || 0) + (r.spot || 0);
+                  return total > 0
+                    ? <Text strong style={{ color: '#1890ff' }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    : <Text type="secondary">—</Text>;
+                }
+              },
+            ]}
+          />
+        </Card>
+      )}
     </>
   );
 }

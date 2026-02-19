@@ -83,6 +83,7 @@ export const api = {
   getBotBalances: () => apiClient.get('/bot-balances'),
   updateBotTrade: (tradeId, data) => apiClient.put(`/bot-trades/${tradeId}`, data),
   getBotPrices: () => apiClient.get('/bot-prices'),
+  getBotBalanceHistory: (days = 30) => apiClient.get('/bot-balance-history', { params: { days } }),
   closeBotTrade: (tradeId) => apiClient.post(`/bot-trades/${tradeId}/close`),
   forceCloseBotTrade: (tradeId) => apiClient.post(`/bot-trades/${tradeId}/force-close`),
   datafixBotTrades: () => apiClient.post('/bot-trades/datafix'),
