@@ -342,24 +342,6 @@ function BotTradesTable() {
     return () => clearInterval(interval);
   }, [loadPrices]);
 
-  const handleForceClose = async (record) => {
-    Modal.confirm({
-      title: `Force-close ${record.ticker} in DB?`,
-      content: `This marks the trade as CLOSED at entry price (PnL=0). Use only if the position no longer exists on Binance.`,
-      okText: 'Force Close',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          await api.forceCloseBotTrade(record.id);
-          message.success(`Trade #${record.id} force-closed`);
-          loadTrades();
-        } catch (err) {
-          message.error(`Failed: ${err.response?.data?.detail || err.message}`);
-        }
-      },
-    });
-  };
-
   const handleClose = async (record) => {
     Modal.confirm({
       title: `Close ${record.ticker} ${record.direction} at market?`,
@@ -575,11 +557,6 @@ function BotTradesTable() {
           <Tooltip title="Close at market price on Binance">
             <Button type="text" size="small" danger loading={closing === record.id} onClick={() => handleClose(record)}>
               Close
-            </Button>
-          </Tooltip>
-          <Tooltip title="Force-close in DB only (position already gone from Binance)">
-            <Button type="text" size="small" style={{ color: '#bbb', fontSize: 10 }} onClick={() => handleForceClose(record)}>
-              ⚠
             </Button>
           </Tooltip>
         </Space>
