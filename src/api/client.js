@@ -84,4 +84,6 @@ export const api = {
   updateBotTrade: (tradeId, data) => apiClient.put(`/bot-trades/${tradeId}`, data),
   getBotPrices: () => apiClient.get('/bot-prices'),
   closeBotTrade: (tradeId) => apiClient.post(`/bot-trades/${tradeId}/close`),
+  forceCloseBotTrade: (tradeId) => apiClient.post(`/bot-trades/${tradeId}/force-close`),
+  datafixBotTrades: () => apiClient.post('/bot-trades/datafix'),
 };
