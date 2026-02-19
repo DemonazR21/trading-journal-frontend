@@ -278,7 +278,7 @@ function BotConfigCard({ botDef, config, onSave, saving }) {
   );
 }
 
-function BotBalanceCards() {
+function BotBalanceCards({ trades = [] }) {
   const [balances, setBalances] = useState([]);
 
   useEffect(() => {
@@ -289,25 +289,52 @@ function BotBalanceCards() {
 
   if (!balances.length) return null;
 
+  // Calculate value currently locked in open trades per bot
+  const inTradesByBot = {};
+  trades.filter(t => t.status === 'OPEN').forEach(t => {
+    const entry = parseFloat(t.entry_price) || 0;
+    const qty = parseFloat(t.quantity) || 0;
+    const lev = parseInt(t.leverage) || 1;
+    const isFutures = (t.trade_type || '').toUpperCase() === 'FUTURES';
+    const value = isFutures ? (entry * qty) / lev : entry * qty;
+    inTradesByBot[t.bot_name] = (inTradesByBot[t.bot_name] || 0) + value;
+  });
+
   return (
     <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-      {balances.map(b => (
-        <Col xs={24} sm={12} key={b.bot_name}>
-          <Card size="small">
-            <Statistic
-              title={<span><WalletOutlined /> {b.bot_name}</span>}
-              value={b.balance}
-              precision={2}
-              prefix="$"
-              suffix="USDT"
-              valueStyle={{ color: '#1890ff' }}
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {b.open_positions} open positions | Updated {dayjs(b.updated_at).format('HH:mm:ss')}
-            </Text>
-          </Card>
-        </Col>
-      ))}
+      {balances.map(b => {
+        const inTrades = inTradesByBot[b.bot_name] || 0;
+        const total = parseFloat(b.balance) + inTrades;
+        return (
+          <Col xs={24} sm={12} key={b.bot_name}>
+            <Card size="small">
+              <Statistic
+                title={<span><WalletOutlined /> {b.bot_name}</span>}
+                value={b.balance}
+                precision={2}
+                prefix="$"
+                suffix="USDT"
+                valueStyle={{ color: '#1890ff' }}
+              />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {b.open_positions} open positions | Updated {dayjs(b.updated_at).format('HH:mm:ss')}
+              </Text>
+              {inTrades > 0 && (
+                <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
+                  <Text style={{ fontSize: 12 }}>
+                    <span style={{ color: '#faad14' }}>In trades:</span>{' '}
+                    <strong>${inTrades.toFixed(2)}</strong>
+                  </Text>
+                  <Text style={{ fontSize: 12 }}>
+                    <span style={{ color: '#52c41a' }}>Total est.:</span>{' '}
+                    <strong>${total.toFixed(2)}</strong>
+                  </Text>
+                </div>
+              )}
+            </Card>
+          </Col>
+        );
+      })}
     </Row>
   );
 }
@@ -566,7 +593,7 @@ function BotTradesTable() {
 
   return (
     <>
-      <BotBalanceCards />
+      <BotBalanceCards trades={trades} />
       <Table
         dataSource={trades}
         columns={columns}
